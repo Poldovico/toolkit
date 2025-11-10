@@ -1,0 +1,298 @@
+#!/bin/bash
+# hcurl - curl wrapper with persistent header management
+# Uses curl's native -K (--config) facility to load headers
+#
+# Usage:
+#   hcurl [COMMAND] [OPTIONS]
+#
+# Commands:
+#   set-header KEY VALUE   - Set a custom header to inject on all requests
+#   get-header KEY         - Get the value of a configured header
+#   list-headers           - List all configured headers
+#   clear-header KEY       - Remove a configured header
+#   clear-all              - Remove all configured headers
+#   (no command)           - Pass through to curl with injected headers
+#
+# Examples:
+#   hcurl set-header "X-Custom-Token" "my-token-123"
+#   hcurl set-header "Authorization" "Bearer mytoken"
+#   hcurl https://api.example.com/endpoint
+#   hcurl -X POST https://api.example.com/endpoint -d '{"key":"value"}'
+#   hcurl list-headers
+#   hcurl clear-header "X-Custom-Token"
+
+set -euo pipefail
+
+# Source common library
+source "${TOOLKIT_ROOT}/lib/common.sh"
+
+# State directory for this script
+STATE_DIR="${TOOLKIT_ROOT}/.state/hcurl"
+CONFIG_FILE="${STATE_DIR}/curl.config"
+
+# Ensure state directory exists
+mkdir -p "$STATE_DIR"
+
+# ============================================================================
+# Helper Functions
+# ============================================================================
+
+# Get a header value from config file
+# Parses curl config format: header = "Key: Value"
+get_header_value() {
+    local key="$1"
+    
+    if [[ ! -f "$CONFIG_FILE" ]]; then
+        return 1
+    fi
+    
+    while IFS= read -r line; do
+        # Parse: header = "Key: Value"
+        if [[ "$line" =~ ^header\ =\ \"([^:]+):\ (.*)\" ]]; then
+            local k="${BASH_REMATCH[1]}"
+            local v="${BASH_REMATCH[2]%\"}"
+            if [[ "$k" == "$key" ]]; then
+                echo "$v"
+                return 0
+            fi
+        fi
+    done < "$CONFIG_FILE"
+    
+    return 1
+}
+
+# Set a header value in config file (create or update)
+set_header_value() {
+    local key="$1"
+    local value="$2"
+    local temp_file="${CONFIG_FILE}.tmp"
+    local found=0
+    
+    # Create temp file with updated headers
+    : > "$temp_file"
+    
+    if [[ -f "$CONFIG_FILE" ]]; then
+        while IFS= read -r line; do
+            # Parse: header = "Key: Value"
+            if [[ "$line" =~ ^header\ =\ \"([^:]+):\ (.*)\" ]]; then
+                local k="${BASH_REMATCH[1]}"
+                if [[ "$k" == "$key" ]]; then
+                    echo "header = \"${key}: ${value}\"" >> "$temp_file"
+                    found=1
+                else
+                    echo "$line" >> "$temp_file"
+                fi
+            else
+                echo "$line" >> "$temp_file"
+            fi
+        done < "$CONFIG_FILE"
+    fi
+    
+    # If key wasn't found, add it
+    if [[ $found -eq 0 ]]; then
+        echo "header = \"${key}: ${value}\"" >> "$temp_file"
+    fi
+    
+    mv "$temp_file" "$CONFIG_FILE"
+}
+
+# Remove a header from config file
+remove_header() {
+    local key="$1"
+    local temp_file="${CONFIG_FILE}.tmp"
+    
+    if [[ ! -f "$CONFIG_FILE" ]]; then
+        return 0
+    fi
+    
+    # Clear temp file
+    : > "$temp_file"
+    
+    while IFS= read -r line; do
+        # Parse: header = "Key: Value"
+        if [[ "$line" =~ ^header\ =\ \"([^:]+):\ (.*)\" ]]; then
+            local k="${BASH_REMATCH[1]}"
+            if [[ "$k" != "$key" ]]; then
+                echo "$line" >> "$temp_file"
+            fi
+        else
+            echo "$line" >> "$temp_file"
+        fi
+    done < "$CONFIG_FILE"
+    
+    if [[ -f "$temp_file" ]]; then
+        mv "$temp_file" "$CONFIG_FILE"
+    else
+        : > "$CONFIG_FILE"
+    fi
+}
+
+# ============================================================================
+# Command Handlers
+# ============================================================================
+
+# ============================================================================
+# Command Handlers
+# ============================================================================
+
+cmd_set_header() {
+    local key="$1"
+    local value="$2"
+    
+    if [[ -z "$key" || -z "$value" ]]; then
+        die "set-header requires both KEY and VALUE arguments"
+    fi
+    
+    set_header_value "$key" "$value"
+    success "Header set: $key"
+}
+
+cmd_get_header() {
+    local key="$1"
+    
+    if [[ -z "$key" ]]; then
+        die "get-header requires a KEY argument"
+    fi
+    
+    if value=$(get_header_value "$key"); then
+        echo "$value"
+        success "Retrieved header: $key"
+    else
+        error "Header not found: $key"
+        return 1
+    fi
+}
+
+cmd_list_headers() {
+    local count=0
+    local line
+    
+    info "Configured custom headers:"
+    if [[ -f "$CONFIG_FILE" ]]; then
+        while IFS= read -r line; do
+            # Parse: header = "Key: Value"
+            if [[ "$line" =~ ^header\ =\ \"([^:]+):\ (.*)\" ]]; then
+                local key="${BASH_REMATCH[1]}"
+                local value="${BASH_REMATCH[2]%\"}"
+                print_kv "$key" "$value"
+                ((count++)) || true
+            fi
+        done < "$CONFIG_FILE"
+    fi
+    
+    if [[ $count -eq 0 ]]; then
+        echo "  (none)" >&2
+    fi
+}
+
+cmd_clear_header() {
+    local key="$1"
+    
+    if [[ -z "$key" ]]; then
+        die "clear-header requires a KEY argument"
+    fi
+    
+    if get_header_value "$key" > /dev/null; then
+        remove_header "$key"
+        success "Header removed: $key"
+    else
+        error "Header not found: $key"
+        return 1
+    fi
+}
+
+cmd_clear_all() {
+    : > "$CONFIG_FILE"
+    success "All headers cleared"
+}
+
+# ============================================================================
+# Main
+# ============================================================================
+
+main() {
+    local command="${1:-}"
+    
+    # Check if first argument looks like a known command
+    case "$command" in
+        set-header)
+            cmd_set_header "${2:-}" "${3:-}"
+            ;;
+        get-header)
+            cmd_get_header "${2:-}"
+            ;;
+        list-headers)
+            cmd_list_headers
+            ;;
+        clear-header)
+            cmd_clear_header "${2:-}"
+            ;;
+        clear-all)
+            cmd_clear_all
+            ;;
+        --help|-h)
+            cat << 'EOF'
+hcurl - curl wrapper with persistent header injection
+
+Uses curl's native -K (--config) facility to load headers from a file.
+
+Usage: hcurl [COMMAND] [OPTIONS]
+
+Commands:
+  set-header KEY VALUE   - Set a custom header to inject on all requests
+  get-header KEY         - Get the value of a configured header
+  list-headers           - List all configured headers
+  clear-header KEY       - Remove a configured header
+  clear-all              - Remove all configured headers
+  (no command)           - Pass through to curl with injected headers
+
+Examples:
+  # Configure custom headers
+  hcurl set-header "X-Custom-Token" "my-token-123"
+  hcurl set-header "Authorization" "Bearer mytoken"
+  
+  # Use curl normally - headers are automatically injected
+  hcurl https://api.example.com/endpoint
+  hcurl -X POST https://api.example.com/endpoint -d '{"key":"value"}'
+  
+  # Manage headers
+  hcurl list-headers
+  hcurl get-header "X-Custom-Token"
+  hcurl clear-header "X-Custom-Token"
+  hcurl clear-all
+
+How It Works:
+  - Headers are stored in: $STATE_DIR/headers.conf (KEY=VALUE format)
+  - A curl config file is generated in: $STATE_DIR/curl.config
+  - Curl is invoked with: curl -K $STATE_DIR/curl.config [arguments]
+  - This leverages curl's native config file facility for maximum compatibility
+  
+  Set DEBUG=1 to see the generated config file.
+EOF
+            ;;
+        *)
+            # Default: treat as curl arguments with header injection
+            if [[ -f "$CONFIG_FILE" ]]; then
+                local header_count=0
+                header_count=$(grep -c "^header = " "$CONFIG_FILE" 2>/dev/null || echo 0)
+                
+                if [[ $header_count -gt 0 ]]; then
+                    if [[ "${DEBUG:-0}" == "1" ]]; then
+                        debug "Using curl config with $header_count header(s)"
+                        cat "$CONFIG_FILE" >&2
+                    fi
+                    
+                    # Use curl's -K option to load headers from config file
+                    command curl -K "$CONFIG_FILE" "$@"
+                else
+                    command curl "$@"
+                fi
+            else
+                # No headers configured, just pass through
+                command curl "$@"
+            fi
+            ;;
+    esac
+}
+
+main "$@"
