@@ -1,0 +1,45 @@
+#!/bin/bash
+# System Information Script
+# Demonstrates using the common library and proper error handling
+
+set -euo pipefail
+
+# Source common library functions
+source "${TOOLKIT_ROOT}/lib/common.sh"
+
+show_system_info() {
+    info "System Information"
+    echo ""
+    
+    # OS Information
+    if command_exists lsb_release; then
+        print_kv "OS" "$(lsb_release -d | cut -f2)"
+    else
+        print_kv "OS" "$(uname -s)"
+    fi
+    
+    # Kernel
+    print_kv "Kernel" "$(uname -r)"
+    
+    # Hostname
+    print_kv "Hostname" "$(hostname)"
+    
+    # CPU Count
+    print_kv "CPU Cores" "$(nproc)"
+    
+    # Uptime
+    print_kv "Uptime" "$(uptime -p 2>/dev/null || echo 'N/A')"
+    
+    # Disk Usage
+    print_kv "Disk Usage" "$(df -h / | awk 'NR==2 {print $3 "/" $2 " (" $5 ")"}')"
+    
+    # RAM Usage
+    if command_exists free; then
+        print_kv "Memory Usage" "$(free -h | awk 'NR==2 {print $3 "/" $2}')"
+    fi
+    
+    echo ""
+    success "System information displayed"
+}
+
+show_system_info

@@ -1,0 +1,21 @@
+#!/bin/bash
+# Example toolkit script
+# Demonstrates how to create scripts for the toolkit
+
+set -euo pipefail
+
+print_banner() {
+    echo "╔════════════════════════════════════════╗"
+    echo "║   Welcome to Toolkit!                  ║"
+    echo "╚════════════════════════════════════════╝"
+}
+
+print_banner
+echo ""
+echo "Toolkit Root: ${TOOLKIT_ROOT:-not set}"
+echo "Script Location: ${0}"
+echo ""
+echo "Available toolkit scripts:"
+if [[ -d "${TOOLKIT_ROOT}/bin" ]]; then
+    ls -1 "${TOOLKIT_ROOT}/bin" | sed 's/^/  - /'
+fi
