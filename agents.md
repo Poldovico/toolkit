@@ -2,7 +2,9 @@
 
 This document outlines the requirements and specifications for maintaining and developing the Toolkit repository.
 
-**Note for AI Agents**: When working on toolkit tasks, be concise with summaries. Avoid repeating detailed recaps of completed work unless specifically requested. Focus on clarity and actionable information rather than verbose repetition.
+**Note for AI Agents**: 
+- When working on toolkit tasks, be concise with summaries. Avoid repeating detailed recaps of completed work unless specifically requested. Focus on clarity and actionable information rather than verbose repetition.
+- **All git operations (add, commit, push, etc.) must be performed by the user.** Never automatically run git commands. Prepare changes and inform the user when they are ready to commit, allowing the user to decide when and how to commit.
 
 ## Repository Overview
 
@@ -107,7 +109,9 @@ This document outlines the requirements and specifications for maintaining and d
 **Documentation Files**:
 - **README.md**: Quick start, usage patterns, project overview
 - **CONTRIBUTING.md**: Developer guide, contribution process, code standards
-- **SUMMARY.md**: Project architecture and advanced features
+- **STATE_MANAGEMENT.md**: State pattern implementation guide
+- **HCURL.md**: hcurl script reference
+- **QUICKREF.md**: Command quick reference
 - **LICENSE**: MIT license (or specified license)
 - **agents.md**: This file (requirements and specifications)
 
@@ -264,6 +268,21 @@ A toolkit installation is considered successful when:
 - [ ] Common library functions are accessible to scripts
 - [ ] `demo.sh` runs successfully
 - [ ] Documentation is complete and accurate
+
+## Agent Validation Checklist
+
+Before informing the user that changes are ready to commit, verify:
+
+- ✅ All code changes are syntactically valid
+- ✅ Scripts run without errors
+- ✅ Tested from different directories
+- ✅ Error handling works correctly
+- ✅ Documentation is accurate and linked properly
+- ✅ No hardcoded paths (uses $TOOLKIT_ROOT)
+- ✅ Code follows style guidelines
+- ✅ Comments explain complex logic
+- ✅ No breaking changes to existing functionality
+- ✅ Changes align with R1-R10 requirements
 
 ## Future Enhancements
 

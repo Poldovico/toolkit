@@ -1,68 +1,75 @@
+````markdown
 # Toolkit - Portable Linux Shell Scripts
 
-A collection of useful Linux shell scripts that can be easily cloned and used without system-wide installation.
+A collection of Linux shell scripts that can be easily cloned and used without system-wide installation.
 
 ## Quick Start
-
-Clone this repository and source the toolkit:
 
 ```bash
 git clone <repo-url> ~/toolkit
 source ~/toolkit/init.sh
 ```
 
-## Usage
-
-After sourcing `init.sh`, all scripts in the toolkit's `bin/` directory will be available in your PATH for the current shell session.
-
-### Temporary Use (Current Session Only)
-
+To make scripts available in all future sessions:
 ```bash
-source ~/toolkit/init.sh
-my-script-name
+echo 'source ~/toolkit/init.sh' >> ~/.bashrc  # or ~/.zshrc
 ```
 
-### Persistent Use (Add to Shell Config)
+## Available Scripts
 
-To make the toolkit available in all future shell sessions, add this line to your shell configuration file (`~/.bashrc`, `~/.zshrc`, etc.):
+- **hcurl** - HTTP client with persistent header injection
+- **sysinfo** - Display system information
+- **hello-toolkit** - Welcome/demo script
 
-```bash
-source ~/toolkit/init.sh
-```
+See [HCURL.md](HCURL.md) for complete hcurl reference. Add your own scripts to `bin/` following [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Project Structure
 
 ```
 toolkit/
-├── init.sh          # Source this file to add scripts to PATH
-├── bin/             # Directory containing all executable scripts
-│   ├── example-script
-│   └── (add more scripts here)
-├── lib/             # Optional: Shared library functions
-├── README.md        # This file
-└── LICENSE          # License file
+├── init.sh              # Source this first
+├── bin/                 # Your scripts go here
+├── lib/common.sh        # Shared functions
+├── .state/              # Git-ignored state (auto-created per script)
+├── README.md            # This file
+├── CONTRIBUTING.md      # How to add scripts
+├── STATE_MANAGEMENT.md  # Persistent state guide
+├── HCURL.md             # hcurl reference
+└── QUICKREF.md          # Command quick reference
 ```
 
-## Creating New Scripts
+## How It Works
 
-1. Create your script in the `bin/` directory
-2. Make it executable: `chmod +x bin/your-script`
-3. Add a shebang line and your script logic
-4. The script will be automatically available after sourcing `init.sh`
+Sourcing `init.sh`:
+1. Sets `$TOOLKIT_ROOT` environment variable
+2. Adds `bin/` to PATH for current session
+3. Auto-sources library functions from `lib/`
 
-### Script Template
+Works with Bash 4.0+ and Zsh 5.0+. To suppress output: `source init.sh 2>/dev/null`
 
-```bash
-#!/bin/bash
-# Script description here
+## Documentation
 
-# Your script logic here
-echo "Hello from your script!"
-```
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to add scripts, best practices, code style
+- **[STATE_MANAGEMENT.md](STATE_MANAGEMENT.md)** - Persistent state pattern for scripts
+- **[HCURL.md](HCURL.md)** - Complete hcurl guide with examples
+- **[QUICKREF.md](QUICKREF.md)** - Command quick reference
 
-## Notes
+## Environment Variables
 
-- Scripts are only added to PATH for the current shell session
-- No system-wide installation needed
-- Safe to use alongside system scripts (be mindful of naming conflicts)
-- Each new shell session requires sourcing `init.sh` (or add it to your shell config)
+After sourcing `init.sh`:
+- `$TOOLKIT_ROOT` - Path to toolkit directory
+- `$DEBUG` - Set to "1" for debug output in scripts
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| Scripts not found | Check PATH: `echo $PATH \| grep toolkit` |
+| State not persisting | Verify: `ls -la .state/` |
+| Headers not injecting (hcurl) | Debug: `DEBUG=1 hcurl https://example.com` |
+
+---
+
+New to toolkit? Start with [CONTRIBUTING.md](CONTRIBUTING.md) to understand how scripts work. See [QUICKREF.md](QUICKREF.md) for a command cheat sheet.
+
+````

@@ -1,194 +1,178 @@
 # Contributing to Toolkit
 
-Thank you for your interest in contributing to the Toolkit project!
+Thank you for contributing to the Toolkit project!
 
-## Adding New Scripts
+## Quick Start - Adding a Script
 
-### Steps
-
-1. Create your script in the `bin/` directory:
+1. Create in `bin/`:
    ```bash
-   touch bin/your-script-name
-   ```
-
-2. Add the shebang and your code:
-   ```bash
+   cat > bin/my-script << 'EOF'
    #!/bin/bash
-   # Description of what your script does
+   # Brief description of what this script does
    
    set -euo pipefail
+   source "${TOOLKIT_ROOT}/lib/common.sh"
    
-   # Your code here
+   main() {
+       # Your logic here
+       success "Script works!"
+   }
+   
+   main "$@"
+   EOF
    ```
 
-3. Make it executable:
-   ```bash
-   chmod +x bin/your-script-name
-   ```
+2. Make executable: `chmod +x bin/my-script`
 
-4. Test it locally:
-   ```bash
-   source init.sh
-   your-script-name
-   ```
+3. Test: `source init.sh && my-script`
 
-5. Update this README with usage instructions if needed
+That's it! See sections below for best practices and patterns.
+
+## Script Requirements
+
+### Essentials
+
+- **Shebang**: `#!/bin/bash` at top
+- **Error handling**: `set -euo pipefail` near top
+- **Documentation**: Comment explaining what script does
+- **Executable**: `chmod +x bin/your-script`
+- **Testing**: Verify it works from different directories
 
 ### Best Practices
 
-- **Error Handling**: Use `set -euo pipefail` at the top of scripts
-- **Documentation**: Add comments explaining what your script does
-- **Portability**: Avoid bash-only features; stick to POSIX-compliant code when possible
-- **Exit Codes**: Return appropriate exit codes (0 for success, non-zero for failure)
-- **Help Text**: Add a `--help` option to your script if it accepts arguments
-- **Reusable Code**: Extract common functions to `lib/` and source them
+- **Use common library**: Source `lib/common.sh` for logging and utilities
+- **Use $TOOLKIT_ROOT**: Never hardcode paths to toolkit
+- **Single purpose**: Keep scripts focused
+- **Help text**: Add `--help` option if script takes arguments
+- **Check dependencies**: Use `command_exists` or `require_command`
+- **Return codes**: Exit 0 on success, non-zero on failure
+- **POSIX-compatible**: Avoid bash-only features when possible
 
-### Using the Common Library
+## Using Common Library Functions
 
-Many utility functions are available in `lib/common.sh`. Source it in your script:
+Source `lib/common.sh` to access:
 
 ```bash
-#!/bin/bash
 source "${TOOLKIT_ROOT}/lib/common.sh"
 
-# Now you can use:
-# - info "message"
-# - success "message"
-# - error "message"
-# - warn "message"
-# - debug "message"
-# - die "message"
-# - command_exists "command"
-# - require_command "command"
-# - print_kv "key" "value"
+info "Information message"          # Info output
+success "Operation successful"      # Success output
+error "Something went wrong"        # Error output
+warn "Be careful"                   # Warning output
+debug "Debug info (if DEBUG=1)"     # Debug output
+die "Fatal error - exit now"        # Print error and exit(1)
+
+command_exists curl || die "curl required"          # Check if command exists
+require_command jq && process_json               # Require command or fail
+print_kv "Setting" "Value"                        # Pretty-print key-value
 ```
 
-### State Management Pattern
+All output goes to stderr except print_kv which formats stdout.
 
-Some scripts need to maintain state across invocations (configuration, cache, runtime data, etc.). Follow these guidelines:
+## State Management (Persistent Storage)
 
-#### Directory Structure
+Scripts can persist configuration, cache, or data across invocations. See [STATE_MANAGEMENT.md](STATE_MANAGEMENT.md) for complete guide.
 
-All script state should be stored in the `.state/` directory at the repository root:
-
-```
-toolkit/
-├── .state/                           # Git-ignored state directory
-│   ├── script-name/                  # Per-script state directory
-│   │   ├── config.conf
-│   │   ├── cache.json
-│   │   └── data.txt
-│   └── another-script/
-│       └── ...
-├── .gitignore                        # Contains .state/ to prevent version control pollution
-└── bin/
-    └── script-name
-```
-
-#### Implementation Pattern
-
-1. **Set state directory in your script**:
-   ```bash
-   STATE_DIR="${TOOLKIT_ROOT}/.state/your-script-name"
-   mkdir -p "$STATE_DIR"
-   ```
-
-2. **Store configuration/state files** in that directory:
-   ```bash
-   CONFIG_FILE="${STATE_DIR}/config.conf"
-   ```
-
-3. **Read/write state as needed** for your script's functionality
-
-#### Example: Custom Header Storage
-
-The `hcurl` script demonstrates this pattern:
-
-```bash
-STATE_DIR="${TOOLKIT_ROOT}/.state/hcurl"
-HEADERS_FILE="${STATE_DIR}/headers.conf"
-
-# Ensure state directory exists
-mkdir -p "$STATE_DIR"
-
-# Save headers
-save_headers() {
-    : > "$HEADERS_FILE"  # Truncate file
-    for key in "${!headers_map[@]}"; do
-        echo "${key}=${headers_map[$key]}" >> "$HEADERS_FILE"
-    done
-}
-
-# Load headers
-load_headers() {
-    declare -gA headers_map
-    [[ -f "$HEADERS_FILE" ]] || return 0
-    while IFS='=' read -r key value; do
-        [[ -z "$key" ]] && continue
-        headers_map["$key"]="$value"
-    done < "$HEADERS_FILE"
-}
-```
-
-#### Best Practices
-
-- **Isolate state**: Each script gets its own directory to avoid conflicts
-- **Document format**: Add comments explaining the format of state files
-- **Handle missing state**: Scripts should work even if state files don't exist yet
-- **Clean on demand**: Provide commands to clear/reset state (e.g., `script-name clear-all`)
-- **Persistent**: State survives script and shell restarts (unlike environment variables)
-- **Git-safe**: The `.state/` directory is in `.gitignore` to prevent accidental commits
-
-### Script Template
+### Quick Example
 
 ```bash
 #!/bin/bash
-# Brief description of your script
-# Usage: script-name [options]
-
 set -euo pipefail
-
-# Source common library
 source "${TOOLKIT_ROOT}/lib/common.sh"
+
+# 1. Initialize state directory
+STATE_DIR="${TOOLKIT_ROOT}/.state/my-script"
+mkdir -p "$STATE_DIR"
+CONFIG_FILE="${STATE_DIR}/config.conf"
+
+# 2. Load existing config
+[[ -f "$CONFIG_FILE" ]] && source "$CONFIG_FILE"
+
+# 3. Save new config
+save_config() {
+    echo "SETTING=$1" > "$CONFIG_FILE"
+}
 
 main() {
-    # Your main logic here
-    success "Script completed successfully"
+    case "${1:-}" in
+        set)   save_config "$2" ;;
+        get)   echo "Setting is: ${SETTING:-not set}" ;;
+        clear) rm -f "$CONFIG_FILE" ;;
+        *)     die "Usage: my-script {set|get|clear}" ;;
+    esac
 }
 
 main "$@"
 ```
 
+**Key points:**
+- Each script gets its own `.state/{script-name}/` directory
+- State is git-ignored automatically (.gitignore includes `.state/`)
+- Survives shell restarts (unlike environment variables)
+- No conflicts between scripts (isolated directories)
+
+For detailed implementation patterns and best practices, see [STATE_MANAGEMENT.md](STATE_MANAGEMENT.md).
+
 ## Code Style
 
-- Use lowercase for variable names
-- Use UPPERCASE for environment variables and constants
-- Use descriptive variable names
-- Add comments for complex logic
-- Keep functions focused and single-purpose
+- **Variables**: lowercase with underscores (`my_var`, `config_file`)
+- **Constants**: UPPERCASE (`MY_CONSTANT`, `DEBUG`)
+- **Functions**: lowercase with underscores (`save_config`, `load_headers`)
+- **Scripts**: lowercase with hyphens (`my-script`, `api-caller`)
+- **Comments**: Explain the "why", not the "what"
+- **Functions**: Keep single-purpose and focused
 
-## Testing
+## Testing Your Script
 
-Before submitting:
+```bash
+# Test 1: Fresh run
+source init.sh
+my-script
 
-1. Test your script directly
-2. Test it from a different directory
-3. Test with various input scenarios
-4. Verify error handling
+# Test 2: With arguments
+my-script --help
+my-script arg1 arg2
+
+# Test 3: From different directory
+cd /tmp && my-script
+
+# Test 4: With debug
+DEBUG=1 my-script
+
+# Test 5: Error conditions
+my-script invalid-arg  # Should exit non-zero
+
+# Test 6: Check syntax
+bash -n bin/my-script
+```
 
 ## Reporting Issues
 
-When reporting bugs, please include:
-
+Include:
 - What you were trying to do
 - What happened
-- What you expected to happen
-- Your environment (OS, shell, toolkit location)
-- Any error messages
+- What you expected
+- Your OS and shell version
+- Error messages
 
 ## Pull Request Guidelines
 
-- Keep PRs focused on a single feature or fix
-- Provide clear commit messages
-- Test your changes thoroughly
-- Update documentation as needed
+- Keep PRs focused (one feature or fix)
+- Clear commit messages
+- Test thoroughly
+- Update documentation
+- Follow style guidelines
+
+## Documentation
+
+When adding features, update relevant docs:
+- **New script**: Add to README.md's "Available Scripts" list
+- **Complex script**: Consider dedicated guide in `/docs/`
+- **New pattern**: Document in CONTRIBUTING.md
+- **State management**: Reference STATE_MANAGEMENT.md
+
+See [QUICKREF.md](QUICKREF.md) for command reference format.
+
+---
+
+Questions? Check [README.md](README.md) for project overview or [STATE_MANAGEMENT.md](STATE_MANAGEMENT.md) for state pattern details.
