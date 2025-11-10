@@ -1,4 +1,3 @@
-````markdown
 # Toolkit - Portable Linux Shell Scripts
 
 A collection of Linux shell scripts that can be easily cloned and used without system-wide installation.
@@ -71,5 +70,3 @@ After sourcing `init.sh`:
 ---
 
 New to toolkit? Start with [CONTRIBUTING.md](CONTRIBUTING.md) to understand how scripts work. See [QUICKREF.md](QUICKREF.md) for a command cheat sheet.
-
-````

@@ -1,4 +1,3 @@
-````markdown
 # Quick Reference - Toolkit Commands
 
 See [README.md](README.md) for complete documentation.
@@ -57,5 +56,3 @@ bash -n bin/script-name       # Check syntax
 ---
 
 See full docs in README.md and contributing guides in CONTRIBUTING.md
-
-````

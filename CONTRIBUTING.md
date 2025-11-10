@@ -1,178 +1,136 @@
 # Contributing to Toolkit
 
-Thank you for contributing to the Toolkit project!
+Add a script to `bin/`. Here's what it needs:
 
-## Quick Start - Adding a Script
-
-1. Create in `bin/`:
-   ```bash
-   cat > bin/my-script << 'EOF'
-   #!/bin/bash
-   # Brief description of what this script does
-   
-   set -euo pipefail
-   source "${TOOLKIT_ROOT}/lib/common.sh"
-   
-   main() {
-       # Your logic here
-       success "Script works!"
-   }
-   
-   main "$@"
-   EOF
-   ```
-
-2. Make executable: `chmod +x bin/my-script`
-
-3. Test: `source init.sh && my-script`
-
-That's it! See sections below for best practices and patterns.
-
-## Script Requirements
-
-### Essentials
-
-- **Shebang**: `#!/bin/bash` at top
-- **Error handling**: `set -euo pipefail` near top
-- **Documentation**: Comment explaining what script does
-- **Executable**: `chmod +x bin/your-script`
-- **Testing**: Verify it works from different directories
-
-### Best Practices
-
-- **Use common library**: Source `lib/common.sh` for logging and utilities
-- **Use $TOOLKIT_ROOT**: Never hardcode paths to toolkit
-- **Single purpose**: Keep scripts focused
-- **Help text**: Add `--help` option if script takes arguments
-- **Check dependencies**: Use `command_exists` or `require_command`
-- **Return codes**: Exit 0 on success, non-zero on failure
-- **POSIX-compatible**: Avoid bash-only features when possible
-
-## Using Common Library Functions
-
-Source `lib/common.sh` to access:
+## Quick Start
 
 ```bash
-source "${TOOLKIT_ROOT}/lib/common.sh"
-
-info "Information message"          # Info output
-success "Operation successful"      # Success output
-error "Something went wrong"        # Error output
-warn "Be careful"                   # Warning output
-debug "Debug info (if DEBUG=1)"     # Debug output
-die "Fatal error - exit now"        # Print error and exit(1)
-
-command_exists curl || die "curl required"          # Check if command exists
-require_command jq && process_json               # Require command or fail
-print_kv "Setting" "Value"                        # Pretty-print key-value
-```
-
-All output goes to stderr except print_kv which formats stdout.
-
-## State Management (Persistent Storage)
-
-Scripts can persist configuration, cache, or data across invocations. See [STATE_MANAGEMENT.md](STATE_MANAGEMENT.md) for complete guide.
-
-### Quick Example
-
-```bash
+cat > bin/my-script << 'EOF'
 #!/bin/bash
 set -euo pipefail
 source "${TOOLKIT_ROOT}/lib/common.sh"
 
-# 1. Initialize state directory
+# Your code here
+success "Works!"
+EOF
+
+chmod +x bin/my-script
+source init.sh && my-script
+```
+
+## Requirements
+
+- `#!/bin/bash` shebang
+- `set -euo pipefail` for error handling
+- Use `$TOOLKIT_ROOT`, not hardcoded paths
+- Source `lib/common.sh` for logging functions
+- Comment explaining what it does
+- Make it executable: `chmod +x`
+- Test it from different directories
+
+## Common Library
+
+Available functions:
+
+```bash
+info "msg"                    # Info message
+success "msg"                 # Success message
+error "msg"                   # Error message
+warn "msg"                    # Warning message
+debug "msg"                   # Debug (if DEBUG=1)
+die "msg"                     # Error and exit
+
+command_exists curl           # Check if command exists
+require_command jq            # Require or fail
+print_kv "key" "value"        # Pretty print
+```
+
+All go to stderr except `print_kv`.
+
+## Persistent State
+
+Store config/cache in `.state/{script-name}/`:
+
+```bash
 STATE_DIR="${TOOLKIT_ROOT}/.state/my-script"
 mkdir -p "$STATE_DIR"
 CONFIG_FILE="${STATE_DIR}/config.conf"
 
-# 2. Load existing config
+# Read
 [[ -f "$CONFIG_FILE" ]] && source "$CONFIG_FILE"
 
-# 3. Save new config
-save_config() {
-    echo "SETTING=$1" > "$CONFIG_FILE"
-}
-
-main() {
-    case "${1:-}" in
-        set)   save_config "$2" ;;
-        get)   echo "Setting is: ${SETTING:-not set}" ;;
-        clear) rm -f "$CONFIG_FILE" ;;
-        *)     die "Usage: my-script {set|get|clear}" ;;
-    esac
-}
-
-main "$@"
+# Write
+echo "KEY=value" > "$CONFIG_FILE"
 ```
 
-**Key points:**
-- Each script gets its own `.state/{script-name}/` directory
-- State is git-ignored automatically (.gitignore includes `.state/`)
-- Survives shell restarts (unlike environment variables)
-- No conflicts between scripts (isolated directories)
+See [STATE_MANAGEMENT.md](STATE_MANAGEMENT.md) for full details.
 
-For detailed implementation patterns and best practices, see [STATE_MANAGEMENT.md](STATE_MANAGEMENT.md).
+## Style
 
-## Code Style
+- Variables: `lowercase_with_underscores`
+- Constants: `UPPERCASE`
+- Functions: `lowercase_with_underscores`
+- Scripts: `lowercase-with-hyphens`
+- Comments explain why, not what
+- Keep functions focused
 
-- **Variables**: lowercase with underscores (`my_var`, `config_file`)
-- **Constants**: UPPERCASE (`MY_CONSTANT`, `DEBUG`)
-- **Functions**: lowercase with underscores (`save_config`, `load_headers`)
-- **Scripts**: lowercase with hyphens (`my-script`, `api-caller`)
-- **Comments**: Explain the "why", not the "what"
-- **Functions**: Keep single-purpose and focused
-
-## Testing Your Script
+## Testing
 
 ```bash
-# Test 1: Fresh run
+# Fresh run
 source init.sh
 my-script
 
-# Test 2: With arguments
+# With arguments
 my-script --help
 my-script arg1 arg2
 
-# Test 3: From different directory
+# Different directory
 cd /tmp && my-script
 
-# Test 4: With debug
+# Debug
 DEBUG=1 my-script
 
-# Test 5: Error conditions
-my-script invalid-arg  # Should exit non-zero
+# Error handling
+my-script bad-arg  # Should fail
 
-# Test 6: Check syntax
+# Syntax check
 bash -n bin/my-script
 ```
 
-## Reporting Issues
+## Before Pushing
 
-Include:
-- What you were trying to do
+- Script runs without errors
+- Works from different directories
+- Error handling works
+- No hardcoded paths
+- Code is readable
+- Comments explain complex logic
+
+## Issues & PRs
+
+**Reporting a bug:**
+- What you did
 - What happened
 - What you expected
-- Your OS and shell version
-- Error messages
+- OS and shell version
+- Any errors
 
-## Pull Request Guidelines
+**Making a PR:**
+- One feature or fix per PR
+- Clear commit message
+- Test it
+- Update docs if needed
+- Follow the style guide
 
-- Keep PRs focused (one feature or fix)
-- Clear commit messages
-- Test thoroughly
-- Update documentation
-- Follow style guidelines
+## Docs
 
-## Documentation
-
-When adding features, update relevant docs:
-- **New script**: Add to README.md's "Available Scripts" list
-- **Complex script**: Consider dedicated guide in `/docs/`
-- **New pattern**: Document in CONTRIBUTING.md
-- **State management**: Reference STATE_MANAGEMENT.md
-
-See [QUICKREF.md](QUICKREF.md) for command reference format.
+If you add something new:
+- Add to README.md's script list
+- Document in CONTRIBUTING.md (here)
+- Use STATE_MANAGEMENT.md for state stuff
+- Reference QUICKREF.md for command format
 
 ---
 
-Questions? Check [README.md](README.md) for project overview or [STATE_MANAGEMENT.md](STATE_MANAGEMENT.md) for state pattern details.
+Questions? See [README.md](README.md) or [STATE_MANAGEMENT.md](STATE_MANAGEMENT.md).
